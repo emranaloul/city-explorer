@@ -48,17 +48,12 @@ function Location( locData ){
 
 server.get( '/weather', ( req , res )=>{
   let forecast = require( './data/weather.json' );
-  console.log( typeof forecast );
-  console.log( forecast );
-  console.log( forecast.length );
-  console.log( forecast.data.length );
 
-  forecast.data.forEach( function ( element , i ) {
-    let weatherData = new Weather ( forecast.data[i] );
-
-
+  forecast.data.forEach( ( element ) => {
+    let weatherData = new Weather ( element );
   } );
   res.send( Weather.all );
+  Weather.all = [];
 } );
 
 
