@@ -7,16 +7,13 @@ const express = require( 'express' );
 require( 'dotenv' ).config();
 
 const cors = require( 'cors' );
-const pg = require( 'pg' );
 
 const server = express();
 
 const PORT = process.env.PORT || 5000;
 
 server.use( cors() );
-const client = new pg.Client( { connectionString: process.env.DATABASE_URL} );
 
-// const client = new pg.Client( { connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false}} );
 server.listen( PORT,()=>{
   console.log( `Listening on PORT ${PORT}` );
 } );
@@ -25,7 +22,6 @@ server.get( '/' , homeRouteHandler );
 server.get( '/location', locationHandler );
 server.get( '/weather', weatherHandler ) ;
 server.get( '/parks', parkHandler );
-
 
 
 function homeRouteHandler ( req , res ) {
@@ -37,32 +33,18 @@ const superagent = require( 'superagent' );
 // http://localhost:3030/location?city=amman
 function locationHandler ( req , res ) {
   let cityName = req.query.city;
+  console.log( cityName );
   let key = process.env.LOCATION_KEY;
   let locURL = `https://eu1.locationiq.com/v1/search.php?key=${key}&q=${cityName}&format=json`;
-  let SQL = `SELECT * FROM location WHERE search_query = ${cityName}`;
-  client.query( SQL )
-    .then( locoData =>{
-      if( locoData.rows.length === 0 ){
-        superagent.get( locURL )
-          .then( geoData =>{
-            console.log( geoData );
-            let gData = geoData.body;
-            let locationData = new Location( cityName, gData );
-            res.send( locationData );
+  superagent.get( locURL )
+    .then( geoData =>{
+      console.log( geoData );
+      let gData = geoData.body;
+      let locationData = new Location( cityName, gData );
+      console.log( locationData );
+      res.send( locationData );
 
-          } );
-
-      }
     } );
-  // // superagent.get( locURL )
-  // //   .then( geoData =>{
-  // //     console.log( geoData );
-  // //     let gData = geoData.body;
-  // //     let locationData = new Location( cityName, gData );
-  // //     console.log( locationData );
-  // //     res.send( locationData );
-
-  //   } );
 
 }
 
