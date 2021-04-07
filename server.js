@@ -7,7 +7,7 @@ const express = require( 'express' );
 require( 'dotenv' ).config();
 
 const cors = require( 'cors' );
-
+const pg = require( 'pg' );
 const server = express();
 
 const PORT = process.env.PORT || 5000;
