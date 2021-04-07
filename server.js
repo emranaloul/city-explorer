@@ -14,12 +14,12 @@ const PORT = process.env.PORT || 5000;
 
 server.use( cors() );
 
-const client = new pg.Client( process.env.DATABASE_URL );
+// const client = new pg.Client( process.env.DATABASE_URL );
 
 
 
 
-// const client = new pg.Client( { connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false}} );
+const client = new pg.Client( { connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false}} );
 // server.listen( PORT,()=>{
 //   console.log( `Listening on PORT ${PORT}` );
 // } );
