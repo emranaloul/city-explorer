@@ -14,14 +14,20 @@ const PORT = process.env.PORT || 5000;
 
 server.use( cors() );
 
-server.listen( PORT,()=>{
-  console.log( `Listening on PORT ${PORT}` );
-} );
+// const client = new pg.Client( process.env.DATABASE_URL );
+
+const client = new pg.Client( { connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false}} );
+// server.listen( PORT,()=>{
+//   console.log( `Listening on PORT ${PORT}` );
+// } );
 
 server.get( '/' , homeRouteHandler );
 server.get( '/location', locationHandler );
 server.get( '/weather', weatherHandler ) ;
 server.get( '/parks', parkHandler );
+
+
+
 
 
 function homeRouteHandler ( req , res ) {
@@ -32,21 +38,62 @@ const superagent = require( 'superagent' );
 
 // http://localhost:3030/location?city=amman
 function locationHandler ( req , res ) {
+  console.log( 'starting locationi handling' );
   let cityName = req.query.city;
   console.log( cityName );
   let key = process.env.LOCATION_KEY;
   let locURL = `https://eu1.locationiq.com/v1/search.php?key=${key}&q=${cityName}&format=json`;
-  superagent.get( locURL )
-    .then( geoData =>{
-      console.log( geoData );
-      let gData = geoData.body;
-      let locationData = new Location( cityName, gData );
-      console.log( locationData );
-      res.send( locationData );
 
+  let SQL = 'SELECT search_query FROM locations';
+  client.query( SQL )
+    .then( locoData =>{
+      console.log( locoData.rows );
+
+      let locationArr = locoData.rows.map( element =>{
+        return element.search_query;
+      } );
+      if( locationArr.includes( cityName ) ){
+        console.log( 'we are working on DATABASE' );
+        let SQL2 = 'SELECT * FROM locations WHERE search_query = $1;';
+        let safeValues = [cityName];
+        client.query( SQL2 , safeValues )
+          .then( geoData =>{
+
+            let gData = geoData.rows[0];
+
+            res.send( gData );
+
+          } // then function ;
+          );//then
+      }//if
+      else{
+        console.log( 'we are working on API' );
+        superagent.get( locURL )
+          .then( geoData =>{
+            let gData = geoData.body;
+            let locationData = new Location( cityName, gData );
+            let search_query = locationData.search_query;
+            let formatted_query = locationData.formatted_query;
+            let latitude = locationData.latitude;
+            let longitude = locationData.longitude;
+            let SQL = 'INSERT INTO locations (search_query,formatted_query,latitude,longitude) VALUES ($1,$2,$3,$4) RETURNING *;';
+            let safeValues = [search_query,formatted_query,latitude,longitude];
+            client.query( SQL, safeValues )
+              .then( result =>{
+                console.log( result.rows[0] );
+                res.send( result.rows[0] );
+              } );
+
+
+          } );
+
+      }
+    }//then function
+    )//then
+    .catch( error=>{
+      res.send( error );
     } );
-
-}
+}//function
 
 function Location( cityName , locData ){
 
@@ -83,7 +130,10 @@ function weatherHandler ( req , res ){
       res.send( weatherArr );
     }
 
-    );}
+    )
+    .catch( error=>{
+      res.send( error );
+    } );}
 
 
 function Weather( weaData ){
@@ -120,7 +170,10 @@ function parkHandler( req,res ){
       } );
       res.send( parksArr );
     }
-    );
+    )
+    .catch( error=>{
+      res.send( error );
+    } );
 
 }
 
@@ -153,3 +206,11 @@ server.get( '*', ( req , res )=>{
   res.status( 500 ).send( errObj );
 
 } );
+
+client.connect()
+  .then( () => {
+    server.listen( PORT, () =>
+      console.log( `listening on ${PORT}` )
+    );
+  } );
+
