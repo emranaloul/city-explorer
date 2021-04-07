@@ -21,81 +21,78 @@ const client = new pg.Client( process.env.DATABASE_URL );
 //   console.log( `Listening on PORT ${PORT}` );
 // } );
 
-server.get( '/' , homeRouteHandler );
+server.get( '/', homeRouteHandler );
 server.get( '/location', locationHandler );
-server.get( '/weather', weatherHandler ) ;
+server.get( '/weather', weatherHandler );
 server.get( '/parks', parkHandler );
 server.get( '/movies', moviesHandler );
 server.get( '/yelp', yelpHandler );
 
-
-
-
-function homeRouteHandler ( req , res ) {
+function homeRouteHandler( req, res ) {
   res.send( 'you are working fine' );
 }
 
 const superagent = require( 'superagent' );
 
 // http://localhost:3030/location?city=amman
-function locationHandler ( req , res ) {
+function locationHandler( req, res ) {
   console.log( 'starting locationi handling' );
   let cityName = req.query.city;
   let key = process.env.LOCATION_KEY;
   let locURL = `https://eu1.locationiq.com/v1/search.php?key=${key}&q=${cityName}&format=json`;
   let SQL = 'SELECT search_query FROM locations';
-  client.query( SQL )
-    .then( locoData =>{
-      console.log( locoData.rows );
+  client
+    .query( SQL )
+    .then(
+      ( locoData ) => {
+        console.log( locoData.rows );
 
-      let locationArr = locoData.rows.map( element =>{
-        return element.search_query;
-      } );
-      if( locationArr.includes( cityName ) ){
-        console.log( 'we are working on DATABASE' );
-        let SQL2 = 'SELECT * FROM locations WHERE search_query = $1;';
-        let safeValues = [cityName];
-        client.query( SQL2 , safeValues )
-          .then( geoData =>{
+        let locationArr = locoData.rows.map( ( element ) => {
+          return element.search_query;
+        } );
+        if ( locationArr.includes( cityName ) ) {
+          console.log( 'we are working on DATABASE' );
+          let SQL2 = 'SELECT * FROM locations WHERE search_query = $1;';
+          let safeValues = [cityName];
+          client.query( SQL2, safeValues ).then(
+            ( geoData ) => {
+              let gData = geoData.rows[0];
 
-            let gData = geoData.rows[0];
-
-            res.send( gData );
-
-          } // then function ;
-          );//then
-      }//if
-      else{
-        console.log( 'we are working on API' );
-        superagent.get( locURL )
-          .then( geoData =>{
+              res.send( gData );
+            } // then function ;
+          ); //then
+        } //if
+        else {
+          console.log( 'we are working on API' );
+          superagent.get( locURL ).then( ( geoData ) => {
             let gData = geoData.body;
             let locationData = new Location( cityName, gData );
             let search_query = locationData.search_query;
             let formatted_query = locationData.formatted_query;
             let latitude = locationData.latitude;
             let longitude = locationData.longitude;
-            let SQL = 'INSERT INTO locations (search_query,formatted_query,latitude,longitude) VALUES ($1,$2,$3,$4) RETURNING *;';
-            let safeValues = [search_query,formatted_query,latitude,longitude];
-            client.query( SQL, safeValues )
-              .then( result =>{
-                console.log( result.rows[0] );
-                res.send( result.rows[0] );
-              } );
-
-
+            let SQL =
+              'INSERT INTO locations (search_query,formatted_query,latitude,longitude) VALUES ($1,$2,$3,$4) RETURNING *;';
+            let safeValues = [
+              search_query,
+              formatted_query,
+              latitude,
+              longitude,
+            ];
+            client.query( SQL, safeValues ).then( ( result ) => {
+              console.log( result.rows[0] );
+              res.send( result.rows[0] );
+            } );
           } );
-
-      }
-    }//then function
-    )//then
-    .catch( error=>{
+        }
+      } //then function
+    ) //then
+    .catch( ( error ) => {
       res.send( error );
     } );
-}//function
+} //function
 
-function Location( cityName , locData ){
-
+function Location( cityName, locData ) {
   // {
   //     "search_query": "seattle",
   //     "formatted_query": "Seattle, WA, USA",
@@ -106,37 +103,30 @@ function Location( cityName , locData ){
   this.formatted_query = locData[0].display_name;
   this.latitude = locData[0].lat;
   this.longitude = locData[0].lon;
-
-
 }
 // http://localhost:3030/weather?search_query=Lynnwood&formatted_query=Lynnwood%2C%20Snohomish%20County%2C%20Washington%2C%20USA&latitude=47.8278656&longitude=-122.3053932&page=1
-function weatherHandler ( req , res ){
-
+function weatherHandler( req, res ) {
   // let cityName = req.query.search_query;
   let lat = req.query.latitude;
   let lon = req.query.longitude;
   // let cityFormat = req.query.formatted_query;
   let key = process.env.WEATHER_KEY;
   let weaURL = `https://api.weatherbit.io/v2.0/forecast/daily?lat=${lat}&lon=${lon}&days=5&key=${key}`;
-  superagent.get( weaURL )
-    .then( weathData =>{
+  superagent
+    .get( weaURL )
+    .then( ( weathData ) => {
       let weatherArr = weathData.body.data.map( ( element ) => {
-
-        return new Weather ( element );
-
+        return new Weather( element );
       } );
 
       res.send( weatherArr );
-    }
-
-    )
-    .catch( error=>{
+    } )
+    .catch( ( error ) => {
       res.send( error );
-    } );}
+    } );
+}
 
-
-function Weather( weaData ){
-
+function Weather( weaData ) {
   //    [
   //   {
   //     "forecast": "Partly cloudy until afternoon.",
@@ -151,32 +141,26 @@ function Weather( weaData ){
 
   this.forecast = weaData.weather.description;
   this.time = weaData.valid_date;
-
-
 }
 // http://localhost:3030/parks?search_query=amman&formatted_query=Amman%2C%2011181%2C%20Jordan&latitude=31.9515694&longitude=35.9239625&page=1
-function parkHandler( req,res ){
-
+function parkHandler( req, res ) {
   let key = process.env.PARK_KEY;
   let cityName = req.query.search_query;
   let parkURL = `https://developer.nps.gov/api/v1/parks?q=${cityName}&limit=10&api_key=${key}`;
-  superagent.get( parkURL )
-    .then( parkData=>{
+  superagent
+    .get( parkURL )
+    .then( ( parkData ) => {
       let parksArr = parkData.body.data.map( ( element ) => {
-
-        return new Park ( element );
-
+        return new Park( element );
       } );
       res.send( parksArr );
-    }
-    )
-    .catch( error=>{
+    } )
+    .catch( ( error ) => {
       res.send( error );
     } );
-
 }
 
-function Park ( pData ){
+function Park( pData ) {
   // {
   //   "name": "Klondike Gold Rush - Seattle Unit National Historical Park",
   //   "address": "319 Second Ave S., Seattle, WA 98104",
@@ -190,58 +174,29 @@ function Park ( pData ){
   this.fee = pData.fee;
   this.description = pData.description;
   this.url = pData.url;
-
 }
 
-function yelpHandler ( req,res ){
-
-  let cityName = req.query.search_query;
-
-  const yelp = require( 'yelp-fusion' );
-
-  const apiKey = process.env.YELP_API_KEY;
-
-  const searchRequest = {
-    location: cityName,
-  };
-
-  const client = yelp.client( apiKey );
-
-  client.search( searchRequest )
-    .then( ( res ) => {
-      console.log( res.jsonBody );
-    } )
-    .catch( ( error ) => {
-      console.log( error );
-    } );
-
-  let yelpURL = `https://api.yelp.com/v3/businesses/search/location=${cityName}`;
-
-  superagent.get( yelpURL )
-    .then( yelpURL =>{
-      console.log( yelpURL.body );
-    } );
-}
-
-function moviesHandler( req, res ){
+function moviesHandler( req, res ) {
   let moviesArr = [];
   let key = process.env.MOVIES_KEY;
   let cityName = req.query.search_query;
   let moviesURL = `https://api.themoviedb.org/3/search/movie?api_key=${key}&query=${cityName}`;
-  superagent.get( moviesURL )
-    .then( moivesData =>{
+  superagent
+    .get( moviesURL )
+    .then( ( moivesData ) => {
       let mData = moivesData.body.results;
       console;
-      moviesArr = mData.map( element =>{
-        return new Movie ( element );
+      moviesArr = mData.map( ( element ) => {
+        return new Movie( element );
       } );
       res.send( moviesArr );
+    } )
+    .catch( ( error ) => {
+      res.send( error );
     } );
-
-
 }
 
-function Movie ( moData ){
+function Movie( moData ) {
   // {
   //   "title": "Sleepless in Seattle",
   //   "overview": "A young boy who tries to set his dad up on a date after the death of his mother. He calls into a radio station to talk about his dad’s loneliness which soon leads the dad into meeting a Journalist Annie who flies to Seattle to write a story about the boy and his dad. Yet Annie ends up with more than just a story in this popular romantic comedy.",
@@ -258,26 +213,85 @@ function Movie ( moData ){
   this.image_url = `https://image.tmdb.org/t/p/w500${moData.poster_path}`;
   this.popularity = moData.popularity;
   this.released_on = moData.release_date;
+}
+let page = 1;
+function yelpHandler( req, res ) {
+  let yelpArr = [];
 
+  page++;
+  let cityName = req.query.search_query;
+
+  const yelp = require( 'yelp-fusion' );
+
+  const apiKey = process.env.YELP_API_KEY;
+
+  const searchRequest = {};
+  let start = 1;
+  function getYelp( city,page ){
+    // let key = process.env.YELP_API_KEY;
+    const numPerPage = 5;
+    const start = ( ( page -1 ) * numPerPage + 1 );
+    // const url = `https://api.yelp.com/v3/businesses/search/location=${city}&limit=${numPerPage}&offset=${start};`;
+    searchRequest.location = city;
+    searchRequest.limit = numPerPage;
+    searchRequest.offset = start;
+    page++;
+  }
+  getYelp( cityName,page );
+
+
+
+  const client = yelp.client( apiKey );
+  // let yelpURL = `https://api.yelp.com/v3/businesses/search/location=${cityName}`;
+  // let yelpURL = `https://api.yelp.com/v3/businesses/search/location=${cityName}`;
+
+
+  client.search( searchRequest )
+    .then( ( yelpObj ) => {
+
+
+      let yelpData = yelpObj.jsonBody.businesses;
+
+      yelpArr = yelpData.map( ( element ) => {
+        return new Yelp( element );
+
+      } );
+      res.send( yelpArr );
+    } )
+
+    .catch( ( error ) => {
+      res.send( error );
+    } );
+
+}
+
+function Yelp( yData ) {
+  // {
+  //   "name": "Pike Place Chowder",
+  //   "image_url": "https://s3-media3.fl.yelpcdn.com/bphoto/ijju-wYoRAxWjHPTCxyQGQ/o.jpg",
+  //   "price": "$$   ",
+  //   "rating": "4.5",
+  //   "url": "https://www.yelp.com/biz/pike-place-chowder-seattle?adjust_creative=uK0rfzqjBmWNj6-d3ujNVA&utm_campaign=yelp_api_v3&utm_medium=api_v3_business_search&utm_source=uK0rfzqjBmWNj6-d3ujNVA"
+  // },
+
+  this.name = yData.name;
+  this.image_url = yData.image_url;
+  this.price = yData.price;
+  this.rating = yData.rating;
+  this.url = yData.url;
 }
 
 
 
-
-server.get( '*', ( req , res )=>{
+server.get( '*', ( req, res ) => {
   let errObj = {
     status: 500,
-    responseText: 'Sorry, something went wrong'
+    responseText: 'Sorry, something went wrong',
   };
 
   res.status( 500 ).send( errObj );
-
 } );
 
-client.connect()
-  .then( () => {
-    server.listen( PORT, () =>
-      console.log( `listening on ${PORT}` )
-    );
-  } );
-
+client.connect().then( () => {
+  server.listen( PORT, () => console.log( `listening on ${PORT}` ) );
+} );
