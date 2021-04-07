@@ -7,13 +7,13 @@ const express = require( 'express' );
 require( 'dotenv' ).config();
 
 const cors = require( 'cors' );
-const pg = require( 'pg' );
 
 const server = express();
 
 const PORT = process.env.PORT || 5000;
 
 server.use( cors() );
+
 // const client = new pg.Client( process.env.DATABASE_URL );
 
 const client = new pg.Client( { connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false}} );
@@ -29,6 +29,7 @@ server.get( '/parks', parkHandler );
 
 
 
+
 function homeRouteHandler ( req , res ) {
   res.send( 'you are working fine' );
 }
@@ -39,8 +40,10 @@ const superagent = require( 'superagent' );
 function locationHandler ( req , res ) {
   console.log( 'starting locationi handling' );
   let cityName = req.query.city;
+  console.log( cityName );
   let key = process.env.LOCATION_KEY;
   let locURL = `https://eu1.locationiq.com/v1/search.php?key=${key}&q=${cityName}&format=json`;
+
   let SQL = 'SELECT search_query FROM locations';
   client.query( SQL )
     .then( locoData =>{
