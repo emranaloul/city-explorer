@@ -14,9 +14,9 @@ const server = express();
 const PORT = process.env.PORT || 5000;
 
 server.use( cors() );
-// const client = new pg.Client( process.env.DATABASE_URL );
+const client = new pg.Client( process.env.DATABASE_URL );
 
-const client = new pg.Client( { connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false}} );
+// const client = new pg.Client( { connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false}} );
 // server.listen( PORT,()=>{
 //   console.log( `Listening on PORT ${PORT}` );
 // } );
@@ -25,6 +25,8 @@ server.get( '/' , homeRouteHandler );
 server.get( '/location', locationHandler );
 server.get( '/weather', weatherHandler ) ;
 server.get( '/parks', parkHandler );
+server.get( '/movies', moviesHandler );
+server.get( '/yelp', yelpHandler );
 
 
 
@@ -188,6 +190,74 @@ function Park ( pData ){
   this.fee = pData.fee;
   this.description = pData.description;
   this.url = pData.url;
+
+}
+
+function yelpHandler ( req,res ){
+
+  let cityName = req.query.search_query;
+
+  const yelp = require( 'yelp-fusion' );
+
+  const apiKey = process.env.YELP_API_KEY;
+
+  const searchRequest = {
+    location: cityName,
+  };
+
+  const client = yelp.client( apiKey );
+
+  client.search( searchRequest )
+    .then( ( res ) => {
+      console.log( res.jsonBody );
+    } )
+    .catch( ( error ) => {
+      console.log( error );
+    } );
+
+  let yelpURL = `https://api.yelp.com/v3/businesses/search/location=${cityName}`;
+
+  superagent.get( yelpURL )
+    .then( yelpURL =>{
+      console.log( yelpURL.body );
+    } );
+}
+
+function moviesHandler( req, res ){
+  let moviesArr = [];
+  let key = process.env.MOVIES_KEY;
+  let cityName = req.query.search_query;
+  let moviesURL = `https://api.themoviedb.org/3/search/movie?api_key=${key}&query=${cityName}`;
+  superagent.get( moviesURL )
+    .then( moivesData =>{
+      let mData = moivesData.body.results;
+      console;
+      moviesArr = mData.map( element =>{
+        return new Movie ( element );
+      } );
+      res.send( moviesArr );
+    } );
+
+
+}
+
+function Movie ( moData ){
+  // {
+  //   "title": "Sleepless in Seattle",
+  //   "overview": "A young boy who tries to set his dad up on a date after the death of his mother. He calls into a radio station to talk about his dad’s loneliness which soon leads the dad into meeting a Journalist Annie who flies to Seattle to write a story about the boy and his dad. Yet Annie ends up with more than just a story in this popular romantic comedy.",
+  //   "average_votes": "6.60",
+  //   "total_votes": "881",
+  //   "image_url": "https://image.tmdb.org/t/p/w500/afkYP15OeUOD0tFEmj6VvejuOcz.jpg",
+  //   "popularity": "8.2340",
+  //   "released_on": "1993-06-24"
+  // },
+  this.title = moData.title;
+  this.overview = moData.overview;
+  this.average_votes = moData.average_votes;
+  this.total_vote = moData.total_vote;
+  this.image_url = `https://image.tmdb.org/t/p/w500${moData.poster_path}`;
+  this.popularity = moData.popularity;
+  this.released_on = moData.release_date;
 
 }
 
